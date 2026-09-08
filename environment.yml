@@ -6,3 +6,4 @@ channels:
 dependencies:
   - python=3.10
   - pip
+  - setuptools<80.9
