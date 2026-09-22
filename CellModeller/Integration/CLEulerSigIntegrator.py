@@ -183,8 +183,8 @@ class CLEulerSigIntegrator:
         specRateKernel = self.regul.specRateCL()
         sigRateKernel = self.regul.sigRateCL()
         #kernel_src = open('CellModeller/Integration/CLCrankNicIntegrator.cl', 'r').read()
-        from pkg_resources import resource_string
-        kernel_src = resource_string(__name__, 'CLCrankNicIntegrator.cl').decode()
+        from pathlib import Path
+        kernel_src = (Path(__file__).parent / 'CLCrankNicIntegrator.cl').read_text()
         # substitute user defined kernel code, and number of signals
         kernel_src = kernel_src % {'sigKernel': sigRateKernel,
                                    'specKernel': specRateKernel,

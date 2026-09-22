@@ -160,8 +160,8 @@ class CLBacterium:
 
     def init_kernels(self):
         """Set up the OpenCL kernels."""
-        from pkg_resources import resource_string
-        kernel_src = resource_string(__name__, 'CLBacterium.cl').decode()
+        from pathlib import Path
+        kernel_src = (Path(__file__).parent / 'CLBacterium.cl').read_text()
 
         self.program = cl.Program(self.context, kernel_src).build(cache_dir=False)
         # Some kernels that seem like they should be built into pyopencl...

@@ -203,8 +203,8 @@ class CLCrankNicIntegrator:
         specRateKernel = self.regul.specRateCL()
         sigRateKernel = self.regul.sigRateCL()
         #kernel_src = open('CellModeller/Integration/CLCrankNicIntegrator.cl', 'r').read()
-        from pkg_resources import resource_string
-        kernel_src = resource_string(__name__, 'CLCrankNicIntegrator.cl').decode()
+        from pathlib import Path
+        kernel_src = (Path(__file__).parent / 'CLCrankNicIntegrator.cl').read_text()
         # substitute user defined kernel code, and number of signals
         kernel_src = kernel_src % {'sigKernel': sigRateKernel,
                                    'specKernel': specRateKernel,
@@ -230,7 +230,7 @@ class CLCrankNicIntegrator:
         self.gridIdxs[:] = self.gridIdxs_dev.get()
 
         # put local cell signal levels in array
-        self.signalLevel_dev.set(self.signalLevel)
+        self.signalLevel_dev.set(self.signalLevel.reshape(self.gridDim))
         self.program.setCellSignals(self.queue, (self.nCells,), None,
                 numpy.int32(self.nSignals),
                 numpy.int32(self.gridTotalSize),
@@ -324,7 +324,7 @@ class CLCrankNicIntegrator:
         convolve(sigLvl, self.greensFunc, mode=self.boundcond)
 
         # put local cell signal levels in array
-        self.signalLevel_dev.set(self.signalLevel)
+        self.signalLevel_dev.set(self.signalLevel.reshape(self.gridDim))
         self.program.setCellSignals(self.queue, (self.nCells,), None,
                 numpy.int32(self.nSignals),
                 numpy.int32(self.gridTotalSize),
@@ -363,7 +363,7 @@ class CLCrankNicIntegrator:
         self.levels = SSLevel
         self.makeViews()
         self.cellSigLevels = cellSigData
-        self.signalLevel_dev.set(self.signalLevel)
+        self.signalLevel_dev.set(self.signalLevel.reshape(self.gridDim))
         self.specLevel_dev.set(self.specLevel)
         self.cellSigLevels_dev.set(self.cellSigLevels)
         cs = self.cellStates
