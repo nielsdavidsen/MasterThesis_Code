@@ -17,6 +17,28 @@ supervisor, or anyone else picking this up.
   - **Linux/Windows**: install your GPU vendor's driver (NVIDIA/AMD/Intel), or
     [`pocl`](http://portablecl.org/) for a CPU-only fallback.
 
+### A note for Windows users
+
+Everything below works the same on Windows, but a couple of Windows-specific gotchas trip people up
+the first time:
+
+- **Use the "Miniforge Prompt"** (installed alongside miniforge) or **Anaconda Prompt**, not a plain
+  Command Prompt/PowerShell window — those have conda's activation hooks already set up. If you'd
+  rather use regular PowerShell, run `conda init powershell` once first, then restart PowerShell.
+- **If PowerShell refuses to activate the environment** with an error like *"running scripts is
+  disabled on this system"*, that's PowerShell's execution policy blocking conda's activation script.
+  Fix it (as an administrator, once) with:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
+- **`pyopencl` install succeeds but `import pyopencl` finds no platforms**: on Windows, `pyopencl`
+  dynamically loads `OpenCL.dll`, which is provided by your GPU driver — it isn't bundled with the
+  Python package. A pip install with no real GPU driver installed will appear to succeed but leave
+  you with zero OpenCL platforms at runtime; see the `pocl` fallback and the troubleshooting bullet
+  below.
+- The commands in this guide are shown as `bash`, but they're plain `git`/`mamba`/`pip`/`python`
+  invocations — they work unchanged in an Anaconda Prompt or PowerShell too.
+
 ## 1. Clone the repo
 
 ```bash
@@ -76,11 +98,14 @@ A window should open and start simulating cell growth. If it does, you're set up
 ## Troubleshooting
 
 - **This repo requires Python 3.12.** Earlier commits used Python 3.10, but `setuptools` removed the
-  `pkg_resources` module that older CellModeller code depended on, and the Python 3.10 `scipy` wheels
-  crash on recent macOS versions. Both are fixed on `master`/`niels`/`maria` as of the Python 3.12
-  migration — if you're on an older commit or a different fork, you may hit either issue.
+  `pkg_resources` module that older CellModeller code depended on — that part affects every OS equally.
+  The Python 3.10 `scipy` wheels also crash on recent macOS versions specifically (unrelated to
+  Windows/Linux). Both are fixed on `master`/`niels`/`maria` as of the Python 3.12 migration — if
+  you're on an older commit or a different fork, you may hit either issue.
 - **`pyopencl` can't find a platform/device**: check `python -c "import pyopencl as cl; print(cl.get_platforms())"`
-  lists something. If it's empty, your OpenCL runtime isn't installed/visible (see Prerequisites above).
+  lists something. If it's empty, your OpenCL runtime isn't installed/visible (see Prerequisites above
+  — this is the most common first-run issue on Windows and Linux, since there's no built-in OpenCL
+  the way macOS has one).
 - **Updating an existing environment** after `environment.yml` changes:
   ```bash
   mamba env update -f environment.yml --prune
