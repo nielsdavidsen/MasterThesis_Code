@@ -577,7 +577,7 @@ __kernel void find_contacts(const int max_cells,
         {
           if (tos[m]==j)
           {
-             existing_cts_idx[n_existing_cts++] = m;
+            existing_cts_idx[n_existing_cts++] = m;
           }
         }
 
@@ -608,24 +608,29 @@ __kernel void find_contacts(const int max_cells,
         float stiffness = two_pts*ISQRT2 + (!two_pts)*1.0;
         
         float overlap_length = two_pts*fabs(dot(pi-pi2,dirs[i]))/(2*POINT) + (!two_pts)*1.0;
-          
+
+
+        // Case 1: This pair (i and j) has never had a contact and is in touching distance   
         if (dist < MARGIN)
         {
-            if (n_existing_cts==0)
-            {
-              // make new contact and compute distance etc.
-              k++; // next contact
-              frs[ct_i] = i;
-              tos[ct_i] = j;
-              dists[ct_i] = dist;
-              pts[ct_i] = pt;
-              norms[ct_i] = norm;
-              reldists[ct_i] = stiffness*RHS_FRAC*dist;
-              stiff[ct_i] = stiffness;
-              overlap[ct_i] = overlap_length;
-            }
-	}
-        if(n_existing_cts>0){
+          if (n_existing_cts==0)
+          {
+            // make new contact and compute distance etc.
+            k++; // next contact
+            frs[ct_i] = i;
+            tos[ct_i] = j;
+            dists[ct_i] = dist;
+            pts[ct_i] = pt;
+            norms[ct_i] = norm;
+            reldists[ct_i] = stiffness*RHS_FRAC*dist;
+            stiff[ct_i] = stiffness;
+            overlap[ct_i] = overlap_length;
+          }
+	      }
+
+        // Case 2: This pair (i and j) already has a contact   
+        if(n_existing_cts>0)
+        {
           // recompute dist etc. for existing contact
           int idx = existing_cts_idx[0];
           dists[idx] = dist;
@@ -636,46 +641,50 @@ __kernel void find_contacts(const int max_cells,
           overlap[idx]=overlap_length;
         }
 
-
-        if (!two_pts){
-	  if(n_existing_cts>1){
-	    // Not parallel, but were before - how to deal with this?
-	    // Set stiffness and rhs (reldists) to zero so that this row has no effect
-	    int idx = existing_cts_idx[1];
-	    /*dists[idx] = 0.0;
-	    pts[idx] = pt;
-	    norms[idx] = norm;*/
-	    reldists[idx] = 0.0;
+        if (!two_pts)
+        {
+          // We need to handle the case where a pair went from "parallel" to "non-parallel"
+	        if(n_existing_cts>1)
+          {
+	          // Not parallel, but were before - how to deal with this?
+	          // Set stiffness and rhs (reldists) to zero so that this row has no effect
+	          int idx = existing_cts_idx[1];
+	          /*dists[idx] = 0.0;
+	          pts[idx] = pt;
+	          norms[idx] = norm;*/
+	          reldists[idx] = 0.0;
             stiff[idx] = 0.0;
-          overlap[idx]=overlap_length;
-	  }
-	  continue;
-	}
+            overlap[idx]=overlap_length;
+	        }
+	        continue;
+	      }
 
-        // if we had two contacts, add the second point
+        // if we had two contacts, add the second point - this block is only accessed if two_pts == 1
         v_ij = pj2-pi2;
         dist = length(v_ij) - (rads[i]+rads[j]);
         norm = normalize(v_ij);
         pt = pi2 + rads[i]*norm;
           
-	// Are cells moving together or penetrating?
-	if (dist < MARGIN)
-	{
-            if (n_existing_cts<2)
-            {
-              ct_i = i*max_contacts+k;
-              k++;
-              frs[ct_i] = i;
-              tos[ct_i] = j;
-              dists[ct_i] = dist;
-              pts[ct_i] = pt;
-              norms[ct_i] = norm;
-              reldists[ct_i] = stiffness*RHS_FRAC*dist;
-              stiff[ct_i] = stiffness;
-              overlap[ct_i]=overlap_length;
-            }
-	}
-        if(n_existing_cts>1){
+	      // Are cells moving together or penetrating?
+	      if (dist < MARGIN)
+        {
+          if (n_existing_cts<2)
+          {
+            ct_i = i*max_contacts+k;
+            k++;
+            frs[ct_i] = i;
+            tos[ct_i] = j;
+            dists[ct_i] = dist;
+            pts[ct_i] = pt;
+            norms[ct_i] = norm;
+            reldists[ct_i] = stiffness*RHS_FRAC*dist;
+            stiff[ct_i] = stiffness;
+            overlap[ct_i]=overlap_length;
+          }
+	      }
+        
+        if(n_existing_cts>1)
+        {
           // recompute dist etc. for existing contact
           int idx = existing_cts_idx[1];
           dists[idx] = dist;
