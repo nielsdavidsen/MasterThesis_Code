@@ -321,7 +321,7 @@ class CLCrankNicIntegrator:
 
         # Convolve (I+hT/2)u_t + f(u_t) with the Greens func to get u_{t+1}
         sigLvl = self.signalLevel.reshape(self.gridDim)
-        convolve(sigLvl, self.greensFunc, mode=self.boundcond)
+        sigLvl[:] = convolve(sigLvl, self.greensFunc, mode=self.boundcond)
 
         # put local cell signal levels in array
         self.signalLevel_dev.set(self.signalLevel.reshape(self.gridDim))
