@@ -15,6 +15,8 @@ def parse_args():
                         help="Path to model file fx. Project/anti_square_slow_server.py")
     parser.add_argument("--max-cells", type=int, default=10*int(1e4),
                         help="Maximum number of cells to simulate (default: 100,000)")
+    parser.add_argument("--antibiotic-diff", type=float, default=2400.0,
+                        help="Diffusion coefficient for antibiotic (default: 2400.0)")
     # Change default when running on server
     parser.add_argument("--max-time", type=int, default=60,
                         help="Maximum simulation time in seconds (default: 60s i.e. 1 min)")
@@ -52,6 +54,7 @@ def main():
 
     # Set the maximum number of cells as an environment variable for the model to read
     os.environ['MAX_CELLS'] = str(args.max_cells)
+    os.environ['ANTIBIOTIC_DIFF'] = str(args.antibiotic_diff)
 
     # Early exit conditions
     if args.list_devices:
