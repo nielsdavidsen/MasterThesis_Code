@@ -4,6 +4,7 @@ from PyQt5.Qt import Qt
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QInputDialog, QFileDialog
 from .PyGLWidget import PyGLWidget
+from . import Renderers
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
@@ -56,6 +57,12 @@ class PyGLCMViewer(PyGLWidget):
         if self.sim:
             del self.sim
         self.sim = sim
+        # Headless models (e.g. for the GPU server) add no renderers, and a
+        # pickle from one carries that model, so add default ones to draw it
+        if not sim.renderers:
+            sim.addRenderer(Renderers.GLBacteriumRenderer(sim))
+            if sim.sig and sim.integ:
+                sim.addRenderer(Renderers.GLGridRenderer(sim.sig, sim.integ, alpha=0.3))
         self.frameNo = sim.stepNum
         if self.run:
             self.frameNo += 1
@@ -182,6 +189,11 @@ class PyGLCMViewer(PyGLWidget):
                 self.modName = data['moduleName']
                 self.moduleStr = data['moduleStr']
                 self.frameNo = data['stepNum']
+                # Models run with Scripts/run_sim_server.py read max_cells from
+                # MAX_CELLS, so make sure it fits the pickle (with room to grow)
+                n_cells = len(data['cellStates'])
+                if int(os.environ.get('MAX_CELLS', 0)) < n_cells:
+                    os.environ['MAX_CELLS'] = str(int(n_cells * 1.5))
                 sim = Simulator(self.modName, \
                                     self.dt, \
                                     moduleStr=self.moduleStr, \
