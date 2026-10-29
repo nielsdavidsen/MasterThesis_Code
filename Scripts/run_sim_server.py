@@ -13,13 +13,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description='CellModeller headless run for server simulations')
     parser.add_argument("model", nargs='?', 
                         help="Path to model file fx. Project/anti_square_slow_server.py")
+    parser.add_argument("--param", action='append', default=[], metavar='NAME=VALUE',
+                        help="Model specific parameter passed to the model as an env var, can be repeated "
+                             "fx. --param ANTIBIOTIC=5 --param ANTIBIOTIC_DIFF=2000 --param F_RES=0.2 "
+                             "(defaults are set at the top of the model file)")
+    
+    # Change default when running on server
     parser.add_argument("--max-cells", type=int, default=10*int(1e4),
                         help="Maximum number of cells to simulate (default: 100,000)")
-    parser.add_argument("--antibiotic-diff", type=float, default=2400.0,
-                        help="Diffusion coefficient for antibiotic (default: 2400.0)")
-    # Change default when running on server
-    parser.add_argument("--max-time", type=int, default=60,
-                        help="Maximum simulation time in seconds (default: 60s i.e. 1 min)")
+    parser.add_argument("--max-time", type=int, default=600,
+                        help="Maximum simulation time in seconds (default: 600s i.e. 10 min)")
     parser.add_argument("--out-root", type=str, default=DEFAULT_OUT_ROOT,
                         help="Root directory for simulation output (default: %s)" % DEFAULT_OUT_ROOT)
     parser.add_argument("--pickle-steps", type=int, default=100,
@@ -54,8 +57,12 @@ def main():
 
     # Set the maximum number of cells as an environment variable for the model to read
     os.environ['MAX_CELLS'] = str(args.max_cells)
-    os.environ['ANTIBIOTIC_DIFF'] = str(args.antibiotic_diff)
-
+    # Set the model specific parameters (--param NAME=VALUE) as environment variables as well
+    for param in args.param:
+        name, sep, value = param.partition('=')
+        if not sep or not name:
+            sys.exit('Error: --param must be given as NAME=VALUE, got %r' % param)
+        os.environ[name] = value
     # Early exit conditions
     if args.list_devices:
         list_devices()
