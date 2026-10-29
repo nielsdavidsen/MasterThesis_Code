@@ -22,8 +22,8 @@ n_species = 1
 lambda_s = 1.93  
 lambda_r = 1.93
 
-ANTIBIOTIC = 10.0
-Diff_A = 100.0
+ANTIBIOTIC = 10
+Diff_A = 2400.0
 
 
 def random_dir():
@@ -94,7 +94,7 @@ def init(cell):
 cl_prefix = \
     '''
 
-        const float D_A = 10.0f;
+        const float D_A = 20.0f;
         const float k_A = 10.0f;
 
         float A_in = species[0];
