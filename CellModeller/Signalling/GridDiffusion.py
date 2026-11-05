@@ -108,12 +108,13 @@ something else - e.g. a bulk flow term.
                 # differences in middle, and forward/backward differences on edges
                 convolve(signalLevelsView[s], advKernel*self.advRates[s], output=signalRatesView[s], mode='nearest')
                 # Diffusion term = \del^2u
-                # Use edge case from boundary conditions for diffusion
+                # Use edge case from boundary conditions for diffusion. laplace() is the 7-point stencil
+                # (sum of neighbours - 6*centre), i.e. h^2*\del^2u, and diffRates = D/h^2, so no extra scaling
                 signalRatesView[s] += laplace(signalLevelsView[s], None, mode=boundcond, cval=boundval) * \
-                                                                                    self.diffRates[s] / 6.0
+                                                                                    self.diffRates[s]
             else:
                 signalRatesView[s] = laplace(signalLevelsView[s], None, mode=boundcond, cval=boundval) \
-                                                                                   * self.diffRates[s] / 6.0
+                                                                                   * self.diffRates[s]
 
  
     def interpAddToGrid(self, pos, delta, grid):
