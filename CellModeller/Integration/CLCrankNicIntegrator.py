@@ -381,4 +381,3 @@ class CLCrankNicIntegrator:
             self.celltype[c.idx] = numpy.int32(c.cellType)
         self.celltype_dev.set(self.celltype)
 
-

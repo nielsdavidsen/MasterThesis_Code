@@ -36,7 +36,7 @@ def setup(sim):
     # Set biophysics, signalling, and regulation models
     biophys = CLBacterium(sim, jitter_z=False, gamma = 50, max_cells=max_cells)
     sig = GridDiffusion(sim, n_signals, grid_dim, grid_size, grid_orig, D=[Diff_A], initLevels=[ANTIBIOTIC])
-    integ = CLCrankNicIntegrator(sim, n_signals, n_species, max_cells, sig, boundcond='nearest')
+    integ = CLCrankNicIntegrator(sim, n_signals, n_species, max_cells, sig, boundcond='constant')
 
     # use this file for reg too
     regul = ModuleRegulator(sim, sim.moduleName)
@@ -108,29 +108,17 @@ def specRateCL():
 
     return cl_prefix + '''
 
-        if (cellType==0){
-        // Antibiotic
-        rates[0] = D_A*(A-A_in)*area/gridVolume;
-        }
-
-        else {
-        // Antibiotic
-        rates[0] = D_A*(A-A_in)*area/gridVolume - k_A*A_in;
-        }
+        rates[0] = 0;
     '''
 
 def sigRateCL():
     global cl_prefix
     return cl_prefix + '''
 
-        if (cellType==0){
-        // Antibiotic
-        rates[0] = 0;
-        }
-    
-        else {
-        // Antibiotic
-        rates[0] = - D_A*(A-A_in)*area/gridVolume;
+        if (cellType == 1) {
+            rates[0] = -k_A * A * volume / gridVolume;
+        } else {
+            rates[0] = 0;
         }
     '''
 
@@ -157,7 +145,7 @@ def update(cells):
     for (id, cell) in cells.items():
 
         #Intracellular concentrations
-        A_in = cell.species[0]
+        A_in = cell.signals[0]
 
 
         if cell.cellType==0:

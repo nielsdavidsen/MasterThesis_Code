@@ -257,7 +257,7 @@ cl_prefix = \
     '''
 
         const float D_A = 20.0f;
-        const float k_A = 10.0f;
+        const float k_A = 0.05f;
 
         float A_in = species[0];
         float A = signals[0];
