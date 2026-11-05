@@ -17,6 +17,26 @@ import pickle
 import pyopencl as cl
 import importlib
 import numpy as np
+import json
+
+
+def pickle_model_params(data, filename):
+    '''
+    Env var model parameters of the run that wrote a pickle, as a dict of strings. Newer pickles store
+    them ('modelParams'). For older ones, fall back to the params.json the headless models
+    (Project/mixed_annulus.py, Project/colliding_front.py) write next to their pickles. Entries in it
+    that a model doesn't read as an env var (e.g. GRID_DIM) are harmless.
+    '''
+    if data.get('modelParams'):
+        return {k: str(v) for k, v in data['modelParams'].items()}
+    path = os.path.join(os.path.dirname(os.path.abspath(filename)), 'params.json')
+    if not os.path.isfile(path):
+        return {}
+    with open(path) as f:
+        params = json.load(f)
+    print('Pickle has no model parameters, using %s' % path)
+    return {k: str(v) for k, v in params.items() if isinstance(v, (int, float, str)) and not isinstance(v, bool)}
+
 
 class PyGLCMViewer(PyGLWidget):
 
@@ -189,18 +209,32 @@ class PyGLCMViewer(PyGLWidget):
                 self.modName = data['moduleName']
                 self.moduleStr = data['moduleStr']
                 self.frameNo = data['stepNum']
-                # Models run with Scripts/run_sim_server.py read max_cells from
-                # MAX_CELLS, so make sure it fits the pickle (with room to grow)
-                n_cells = len(data['cellStates'])
-                if int(os.environ.get('MAX_CELLS', 0)) < n_cells:
-                    os.environ['MAX_CELLS'] = str(int(n_cells * 1.5))
-                sim = Simulator(self.modName, \
-                                    self.dt, \
-                                    moduleStr=self.moduleStr, \
-                                    clPlatformNum=self.clPlatformNum, \
-                                    clDeviceNum=self.clDeviceNum, \
-                                    is_gui=True) 
- 
+                # Models run with Scripts/run_sim_server.py read their parameters (incl. MAX_CELLS,
+                # which sizes the diffusion grid) from env vars, so rebuild the model with the
+                # parameters of the run that wrote the pickle
+                params = pickle_model_params(data, filename)
+                if 'MAX_CELLS' not in params:
+                    # Unknown run parameters: at least make max_cells fit the pickle (with room to grow)
+                    n_cells = len(data['cellStates'])
+                    if int(os.environ.get('MAX_CELLS', 0)) < n_cells:
+                        params['MAX_CELLS'] = str(int(n_cells * 1.5))
+                print('Model parameters for %s: %s' % (self.modName, params))
+                # Set them only while the model is imported, so they don't leak into later loads
+                old_env = dict(os.environ)
+                os.environ.update(params)
+                try:
+                    sim = Simulator(self.modName, \
+                                        self.dt, \
+                                        moduleStr=self.moduleStr, \
+                                        clPlatformNum=self.clPlatformNum, \
+                                        clDeviceNum=self.clDeviceNum, \
+                                        is_gui=True)
+                finally:
+                    os.environ.clear()
+                    os.environ.update(old_env)
+                # Keep them for any pickles saved from this simulator
+                sim.modelParams = params
+
                 self.loadingFromPickle = True
                 sim.loadFromPickle(data)
                 self.setSimulator(sim)

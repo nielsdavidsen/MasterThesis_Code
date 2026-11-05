@@ -25,6 +25,7 @@ lambda_r = 1.93
 
 ANTIBIOTIC = float(os.environ.get("ANTIBIOTIC", 10.0))            # initial antibiotic per grid cell
 Diff_A = float(os.environ.get("ANTIBIOTIC_DIFF", 2000.0))         # default: 2000.0
+k_deg = float(os.environ.get("ANTIBIOTIC_DEG", 0.05))             # default: 0.05, degradation rate of antibiotic by resistant cells
 
 # Initial colony
 # The number of cells in each rectangle follows from DENSITY * HEIGHT * width
@@ -176,6 +177,8 @@ D_GROWTH_MAX = (-(W_TOTAL + HEIGHT) + math.sqrt((W_TOTAL + HEIGHT)**2 + 4 * max_
 nx_grid = 2 * int(math.ceil((W_TOTAL/2 + D_GROWTH_MAX + GRID_BUFFER) / gs))
 ny_grid = 2 * int(math.ceil((HEIGHT/2 + D_GROWTH_MAX + GRID_BUFFER) / gs))
 x_centre = (W_R - W_S) / 2  # the gap is centred on x=0, so the colony is off centre if W_S != W_R
+# Thin slab (z from -8 to 24) around the cell plane z=0, with no-flux ('nearest') boundaries. The
+# antibiotic equilibrates over the slab thickness quickly, so the field is effectively 2D like the colony
 grid_dim = (nx_grid, ny_grid, 8) # dimension of diffusion space, unit = number of grid
 grid_size = (gs, gs, gs) # grid size
 grid_orig = (x_centre - nx_grid//2 * gs, -ny_grid//2 * gs, -8) # where to place the diffusion space onto simulation space
@@ -228,7 +231,7 @@ def setup(sim):
     # The parameters come from env vars and are not in the saved model source, so record them
     params = dict(N_CELLS=N_S + N_R, N_SENSITIVE=N_S, N_RESISTANT=N_R, DENSITY=DENSITY, HEIGHT=HEIGHT,
                   W_S=W_S, W_R=W_R, GAP=GAP, ANTIBIOTIC=ANTIBIOTIC,
-                  ANTIBIOTIC_DIFF=Diff_A, MAX_CELLS=max_cells, SEED=SEED,
+                  ANTIBIOTIC_DIFF=Diff_A, ANTIBIOTIC_DEG=k_deg, MAX_CELLS=max_cells, SEED=SEED,
                   GRID_DIM=grid_dim, GRID_ORIG=grid_orig, GRID_SIZE=gs, D_GROWTH_MAX=D_GROWTH_MAX)
     print('colliding_front parameters: ' + json.dumps(params))
     if sim.saveOutput:
@@ -251,15 +254,16 @@ def init(cell):
     # Specify initial concentration of signaling molecules
     cell.signals[:] = [0.0]*n_signals
 
+# k_deg is a Python value, so it is written into the OpenCL source as a float literal
 cl_prefix = \
     '''
 
         const float D_A = 20.0f;
-        const float k_A = 10.0f;
+        const float k_deg = %rf;
 
         float A_in = species[0];
         float A = signals[0];
-        '''
+        ''' % k_deg
 
 
 def specRateCL():
@@ -275,7 +279,7 @@ def specRateCL():
 
         else {
         // Antibiotic
-        rates[0] = D_A*(A-A_in)*area/gridVolume - k_A*A_in;
+        rates[0] = D_A*(A-A_in)*area/gridVolume - k_deg*A_in;
         }
     '''
 

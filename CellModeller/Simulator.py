@@ -49,6 +49,9 @@ visualised.
         self.sig = None
         self.integ = None
         self.pickleSteps = pickleSteps
+        # Model parameters passed as env vars (e.g. --param in Scripts/run_sim_server.py). They are not
+        # part of the saved model source, so they go in the pickle to rebuild the same model on load
+        self.modelParams = {}
 
         # No cells yet, initialise indices and empty lists/dicts, zero counters
         self._next_id = 1
@@ -393,6 +396,7 @@ visualised.
         data['lineage'] = self.lineage
         data['moduleStr'] = self.moduleOutput
         data['moduleName'] = self.moduleName
+        data['modelParams'] = self.modelParams
         if self.integ:
         #    print("Writing new pickle format")
             data['specData'] = self.integ.levels
@@ -434,6 +438,15 @@ visualised.
         if max_cells is not None and len(data['cellStates']) > max_cells:
             raise ValueError('Pickle has %d cells but the model only allocates max_cells=%d - increase max_cells to load it'
                              % (len(data['cellStates']), max_cells))
+        # The signal grid is copied as a flat array, so it must have the same layout as the saved one.
+        # Otherwise the rows get scrambled (and the cell species are read from the wrong offset)
+        if self.sig and 'sigGridDim' in data:
+            saved = (tuple(int(n) for n in data['sigGridDim']), tuple(float(x) for x in data['sigGridOrig']))
+            ours = (tuple(int(n) for n in self.sig.gridDim), tuple(float(x) for x in self.sig.gridOrig))
+            if saved != ours:
+                raise ValueError('Pickle has signal grid dim %s orig %s but the model built dim %s orig %s - '
+                                 'load it with the model parameters (e.g. MAX_CELLS) of the run that wrote it'
+                                 % (saved[0], saved[1], ours[0], ours[1]))
         self.setCellStates(data['cellStates'])
         self.lineage = data['lineage']
         self.stepNum = data['stepNum']

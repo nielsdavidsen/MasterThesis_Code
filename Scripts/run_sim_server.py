@@ -3,6 +3,7 @@ import time
 import os
 import sys
 
+# Home folder on every OS (expanduser gives C:\Users\<name> on Windows, /home/<name> on Linux)
 DEFAULT_OUT_ROOT = '~/cellmodeller'
 
 def parse_args():
@@ -15,7 +16,7 @@ def parse_args():
                         help="Path to model file fx. Project/anti_square_slow_server.py")
     parser.add_argument("--param", action='append', default=[], metavar='NAME=VALUE',
                         help="Model specific parameter passed to the model as an env var, can be repeated "
-                             "fx. --param ANTIBIOTIC=5 --param ANTIBIOTIC_DIFF=2000 --param F_RES=0.2 "
+                             "fx. --param ANTIBIOTIC=5 --param ANTIBIOTIC_DIFF=2000 --param S_R=10 "
                              "(defaults are set at the top of the model file)")
     
     # Change default when running on server
@@ -58,11 +59,13 @@ def main():
     # Set the maximum number of cells as an environment variable for the model to read
     os.environ['MAX_CELLS'] = str(args.max_cells)
     # Set the model specific parameters (--param NAME=VALUE) as environment variables as well
+    model_params = {'MAX_CELLS': str(args.max_cells)}
     for param in args.param:
         name, sep, value = param.partition('=')
         if not sep or not name:
             sys.exit('Error: --param must be given as NAME=VALUE, got %r' % param)
         os.environ[name] = value
+        model_params[name] = value
     # Early exit conditions
     if args.list_devices:
         list_devices()
@@ -88,7 +91,9 @@ def main():
     from CellModeller.Simulator import Simulator
     sim = Simulator(modname, args.dt, outputDirName=args.name,
                     clPlatformNum=args.platform, clDeviceNum=args.device, saveOutput=True)
-    
+    # Saved in every pickle, so loading one rebuilds the model (and its grid) with the same parameters
+    sim.modelParams = model_params
+
     # Set the number of steps between saving simulation state if specified (should this not be coordinated with the model file?)
     if args.pickle_steps is not None:
         sim.pickleSteps = args.pickle_steps

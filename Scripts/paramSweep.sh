@@ -1,27 +1,28 @@
 #!/bin/bash
 # Parameter sweep for Project/mixed_annulus.py or Project/colliding_front.py on the local machine.
-# Double loop: an outer model parameter (F_RES for mixed_annulus, W_R for colliding_front) and the
+# Double loop: an outer model parameter (S_R for mixed_annulus, ANTIBIOTIC_DIFF for colliding_front) and the
 # antibiotic concentration, optionally repeated over several random seeds. Each run goes through
 # Scripts/run_sim_server.py. All runs of one sweep are grouped in <out-root>/data/<model>-sweep-<date>/
 # together with a log file per run.
 #
-# Usage: Scripts/run_sweep_local.sh MODEL [options]
+# Usage: Scripts/paramSweep.sh MODEL [options]
 #   MODEL          mixed_annulus or colliding_front
-#   -t SECONDS     max simulation time per run (default: 600)
-#   -c N           max cells per run (default: 100000)
-#   -k NAME        name of the outer loop parameter (default: F_RES / W_R depending on MODEL)
+#   -t SECONDS     max simulation time per run (default: 300)
+#   -c N           max cells per run (default: 200000)
+#   -k NAME        name of the outer loop parameter (default: S_R / ANTIBIOTIC_DIFF depending on MODEL)
 #   -v "LIST"      values of the outer loop parameter (default: see below)
-#   -a "LIST"      antibiotic values (default: "2.5 5 10")
+#   -a "LIST"      antibiotic values (default: "10")
 #   -s "LIST"      seeds, one run per seed (default: "1")
 #   -p NAME=VALUE  extra model parameter, passed on as --param, can be repeated
+#                  (e.g. -p ANTIBIOTIC_DEG=0.1, the degradation rate by resistant cells, default 0.05)
 #   -e STEPS       pickle every STEPS steps (default: 100)
 #   -n             dry run: only print the commands
 #
 # Examples:
-#   Scripts/run_sweep_local.sh mixed_annulus -t 60 -v "0.1 0.2" -a "5 10"
-#   Scripts/run_sweep_local.sh colliding_front -v "15 30 60" -p HEIGHT=300
+#   Scripts/paramSweep.sh mixed_annulus -t 60 -v "10 100" -a "5 10"
+#   Scripts/paramSweep.sh colliding_front -k W_R -v "15 30 60" -p HEIGHT=300 -p ANTIBIOTIC_DEG=0.1
 
-# Python from the cellmodeller-thesis environment, override with: PYTHON=/path/to/python Scripts/run_sweep_local.sh ...
+# Python from the cellmodeller-thesis environment, override with: PYTHON=/path/to/python Scripts/paramSweep.sh ...
 PYTHON=${PYTHON:-$HOME/.local/share/mamba/envs/cellmodeller-thesis/bin/python}
 OUT_ROOT=${OUT_ROOT:-$HOME/cellmodeller}
 
@@ -35,14 +36,14 @@ EXTRA_PARAMS=()
 DRY_RUN=0
 
 usage() {
-    sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
 }
 
 MODEL=$1
 case "$MODEL" in
-    mixed_annulus)   LOOP_PARAM=F_RES; LOOP_VALUES="0.05 0.1 0.2" ;;
-    colliding_front) LOOP_PARAM=ANTIBIOTIC_DIFF;   LOOP_VALUES="1600 2000 2400" ;;
+    mixed_annulus)   LOOP_PARAM=S_R;   LOOP_VALUES="2 10 100 1000 10000" ;;
+    colliding_front) LOOP_PARAM=ANTIBIOTIC_DIFF; LOOP_VALUES="1600 2000 2400" ;;
     *) usage ;;
 esac
 shift
