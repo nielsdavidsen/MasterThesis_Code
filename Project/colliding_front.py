@@ -177,12 +177,11 @@ D_GROWTH_MAX = (-(W_TOTAL + HEIGHT) + math.sqrt((W_TOTAL + HEIGHT)**2 + 4 * max_
 nx_grid = 2 * int(math.ceil((W_TOTAL/2 + D_GROWTH_MAX + GRID_BUFFER) / gs))
 ny_grid = 2 * int(math.ceil((HEIGHT/2 + D_GROWTH_MAX + GRID_BUFFER) / gs))
 x_centre = (W_R - W_S) / 2  # the gap is centred on x=0, so the colony is off centre if W_S != W_R
-# Agar below the colony: the cells lie at z=0 (jitter_z=False), which is the top grid node, so there is
-# no medium above them. NZ layers of agar reach down to z=-(NZ-1)*gs
-NZ = 8
-grid_dim = (nx_grid, ny_grid, NZ) # dimension of diffusion space, unit = number of grid
+# Thin slab (z from -8 to 24) around the cell plane z=0, with no-flux ('nearest') boundaries. The
+# antibiotic equilibrates over the slab thickness quickly, so the field is effectively 2D like the colony
+grid_dim = (nx_grid, ny_grid, 8) # dimension of diffusion space, unit = number of grid
 grid_size = (gs, gs, gs) # grid size
-grid_orig = (x_centre - nx_grid//2 * gs, -ny_grid//2 * gs, -(NZ - 1) * gs) # where to place the diffusion space onto simulation space
+grid_orig = (x_centre - nx_grid//2 * gs, -ny_grid//2 * gs, -8) # where to place the diffusion space onto simulation space
 grid_x = (grid_orig[0], grid_orig[0] + grid_dim[0]*gs)
 grid_y = (grid_orig[1], grid_orig[1] + grid_dim[1]*gs)
 

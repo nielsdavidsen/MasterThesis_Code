@@ -183,12 +183,11 @@ DENSITY, N_RES = check_params()
 # i.e. a disk of area pi*R_OUTER^2 + max_cells*AREA_PER_CELL
 R_COLONY_MAX = math.sqrt(R_OUTER**2 + max_cells * AREA_PER_CELL / math.pi)
 n_grid = 2 * int(math.ceil((R_COLONY_MAX + GRID_BUFFER) / gs))
-# Agar below the colony: the cells lie at z=0 (jitter_z=False), which is the top grid node, so there is
-# no medium above them. NZ layers of agar reach down to z=-(NZ-1)*gs
-NZ = 8
-grid_dim = (n_grid, n_grid, NZ) # dimension of diffusion space, unit = number of grid
+# Thin slab (z from -8 to 24) around the cell plane z=0, with no-flux ('nearest') boundaries. The
+# antibiotic equilibrates over the slab thickness quickly, so the field is effectively 2D like the colony
+grid_dim = (n_grid, n_grid, 8) # dimension of diffusion space, unit = number of grid
 grid_size = (gs, gs, gs) # grid size
-grid_orig = (-n_grid//2 * gs, -n_grid//2 * gs, -(NZ - 1) * gs) # where to place the diffusion space onto simulation space
+grid_orig = (-n_grid//2 * gs, -n_grid//2 * gs, -8) # where to place the diffusion space onto simulation space
 grid_x = (grid_orig[0], grid_orig[0] + grid_dim[0]*gs)
 grid_y = (grid_orig[1], grid_orig[1] + grid_dim[1]*gs)
 
