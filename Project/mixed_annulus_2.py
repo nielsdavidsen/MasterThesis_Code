@@ -11,25 +11,39 @@ from CellModeller.Integration.CLCrankNicIntegrator import CLCrankNicIntegrator #
 
 # Annulus of randomly mixed sensitive (cellType 0) and resistant (cellType 1) cells.
 # Headless: run with Scripts/run_sim_server.py, model parameters are passed as env vars, e.g.
-#   python Scripts/run_sim_server.py Project/mixed_annulus.py --param ANTIBIOTIC=5 --param F_RES=0.2
+#  --->    python Scripts/run_sim_server.py Project/mixed_annulus_2.py --param ANTIBIOTIC=5 --param S_R=10
+# If none are specified, defaults are used (see below). 
+# These are based on the articel "Pushing for survival: Spatial intermixing and indirect resistance enbale collective growth".
+# The initial state is saved in the output folder as params.json.
 
-gs = 4
-max_cells = int(os.environ.get("MAX_CELLS", 10 * int(1e4)))  # default: 100,000
+gs = 32                                                         # voxel edge (um) of the diffusion grid
+N_LAYERS = 4                                                    # number of voxel layers in z, slab height gs*N_LAYERS = 128 um
+max_cells = int(os.environ.get("MAX_CELLS", 10 * int(1e4)))     # default: 100,000
 
 n_signals = 1
 n_species = 1
 
-lambda_s = 1.93
-lambda_r = 1.93
+lambda_s = 1.93                                                     # sensitive cell max growth rate h^-1
+lambda_r = 1.93                                                     # resistant cell max growth rate h^-1
+ANTIBIOTIC = float(os.environ.get("ANTIBIOTIC", 10.0))              # initial antibiotic per grid cell
+Diff_A = float(os.environ.get("ANTIBIOTIC_DIFF", 720000.0))         # default: 720000.0 (um^2)/h
+k_deg = float(os.environ.get("ANTIBIOTIC_DEG", 7500.0))             # default: 7500.0 (um^3)/h, reported clearance per cell
 
-ANTIBIOTIC = float(os.environ.get("ANTIBIOTIC", 10.0))            # initial antibiotic per grid cell
-Diff_A = float(os.environ.get("ANTIBIOTIC_DIFF", 2000.0))         # default: 2000.0
+# The reported clearance was measured for a cell of area CELL_AREA under a medium column of height H_MEDIUM,
+# which it depletes at the rate k_deg_eff. In the model each resistant cell depletes a column of the same area
+# through our slab (volume CELL_AREA*SLAB_HEIGHT) at that rate, giving the same depletion per area as in the experiment
+
+CELL_AREA = 1.0                                                     # area of a cell in the experiment (um^2)
+H_MEDIUM = 5000.0                                                   # medium height in the experiment (um)
+SLAB_HEIGHT = gs * N_LAYERS                                         # height of the diffusion grid (um)
+k_deg_eff = k_deg * SLAB_HEIGHT / H_MEDIUM                          # effective clearance per cell in the model (um^3/h), scaled to the slab height
+
 
 # Initial colony
-N_CELLS = int(os.environ.get("N_CELLS", 400))      # total number of initial cells
-F_RES = float(os.environ.get("F_RES", 0.1))        # fraction of resistant cells, in [0, 1]
-R_OUTER = float(os.environ.get("R_OUTER", 60.0))   # outer radius of the annulus
-R_INNER = float(os.environ.get("R_INNER", 30.0))   # inner radius of the annulus (0 gives a disk)
+N_CELLS = int(os.environ.get("N_CELLS", 20000))    # total number of initial cells
+S_R = float(os.environ.get("S_R", 10.0))           # ratio of sensitive to resistant cells S/R, > 0
+R_OUTER = float(os.environ.get("R_OUTER", 420.0))  # outer radius of the annulus
+R_INNER = float(os.environ.get("R_INNER", 190.0))  # inner radius of the annulus (0 gives a disk)
 SEED = os.environ.get("SEED")                      # optional random seed for reproducible layouts
 
 # Initial cell geometry. The length is below the smallest targetVol (2.5), so the placed cells
@@ -156,8 +170,8 @@ def check_params():
         fail('N_CELLS must be at least 1')
     if N_CELLS >= max_cells:
         fail('N_CELLS (%d) must be below MAX_CELLS (%d)' % (N_CELLS, max_cells))
-    if not 0.0 <= F_RES <= 1.0:
-        fail('F_RES must be in [0, 1], got %g' % F_RES)
+    if S_R <= 0.0:
+        fail('S_R must be positive, got %g' % S_R)
     if R_INNER < 0.0:
         fail('R_INNER must be non-negative')
     if R_OUTER - R_INNER < CELL_LENGTH + 2*CELL_RADIUS:
@@ -167,19 +181,24 @@ def check_params():
     if density > MAX_DENSITY:
         fail('initial density %.4f cells/um^2 exceeds MAX_DENSITY %.4f - lower N_CELLS or enlarge the annulus'
              % (density, MAX_DENSITY))
-    return density
+    # S/R = (N_CELLS - n_res) / n_res, rounded to whole cells
+    n_res = int(round(N_CELLS / (1.0 + S_R)))
+    if n_res < 1 or n_res == N_CELLS:
+        fail('S_R = %g with N_CELLS = %d gives %d resistant cells - raise N_CELLS or change S_R'
+             % (S_R, N_CELLS, n_res))
+    return density, n_res
 
 # Validate on import, i.e. before the Simulator creates an output folder for this run
-DENSITY = check_params()
+DENSITY, N_RES = check_params()
 
 #Specify parameter for solving diffusion dynamics #Add
 # Square grid centred on the annulus. Largest colony: all max_cells packed outside the hole,
 # i.e. a disk of area pi*R_OUTER^2 + max_cells*AREA_PER_CELL
 R_COLONY_MAX = math.sqrt(R_OUTER**2 + max_cells * AREA_PER_CELL / math.pi)
 n_grid = 2 * int(math.ceil((R_COLONY_MAX + GRID_BUFFER) / gs))
-grid_dim = (n_grid, n_grid, 8) # dimension of diffusion space, unit = number of grid
+grid_dim = (n_grid, n_grid, N_LAYERS) # dimension of diffusion space, unit = number of grid
 grid_size = (gs, gs, gs) # grid size
-grid_orig = (-n_grid//2 * gs, -n_grid//2 * gs, -8) # where to place the diffusion space onto simulation space
+grid_orig = (-n_grid//2 * gs, -n_grid//2 * gs, -gs) # where to place the diffusion space onto simulation space, cells (z=0) in layer 1
 grid_x = (grid_orig[0], grid_orig[0] + grid_dim[0]*gs)
 grid_y = (grid_orig[1], grid_orig[1] + grid_dim[1]*gs)
 
@@ -217,9 +236,8 @@ def setup(sim):
 
     cells = place_cells(N_CELLS, sample_pos, fits)
 
-    # Exactly round(F_RES*N_CELLS) resistant cells, spread at random over the placed cells
-    n_res = int(round(F_RES * N_CELLS))
-    types = [1]*n_res + [0]*(N_CELLS - n_res)
+    # Exactly N_RES resistant cells, spread at random over the placed cells
+    types = [1]*N_RES + [0]*(N_CELLS - N_RES)
     random.shuffle(types)
 
     for (pos, dir), cellType in zip(cells, types):
@@ -234,9 +252,10 @@ def setup(sim):
     check_no_overlaps(sim)
 
     # The parameters come from env vars and are not in the saved model source, so record them
-    params = dict(N_CELLS=N_CELLS, N_SENSITIVE=N_CELLS - n_res, N_RESISTANT=n_res, F_RES=F_RES,
+    params = dict(N_CELLS=N_CELLS, N_SENSITIVE=N_CELLS - N_RES, N_RESISTANT=N_RES, S_R=S_R,
                   R_OUTER=R_OUTER, R_INNER=R_INNER, DENSITY=DENSITY, ANTIBIOTIC=ANTIBIOTIC,
-                  ANTIBIOTIC_DIFF=Diff_A, MAX_CELLS=max_cells, SEED=SEED,
+                  ANTIBIOTIC_DIFF=Diff_A, ANTIBIOTIC_DEG=k_deg, ANTIBIOTIC_DEG_EFF=k_deg_eff,
+                  CELL_AREA=CELL_AREA, H_MEDIUM=H_MEDIUM, SLAB_HEIGHT=SLAB_HEIGHT, MAX_CELLS=max_cells, SEED=SEED,
                   GRID_DIM=grid_dim, GRID_ORIG=grid_orig, GRID_SIZE=gs, R_COLONY_MAX=R_COLONY_MAX)
     print('mixed_annulus parameters: ' + json.dumps(params))
     if sim.saveOutput:
@@ -262,12 +281,11 @@ def init(cell):
 cl_prefix = \
     '''
 
-        const float D_A = 20.0f;
-        const float k_A = 1.0f;
+        const float k_deg_eff = %rf;
 
         float A_in = species[0];
         float A = signals[0];
-        '''
+        ''' % k_deg_eff
 
 
 def specRateCL():
@@ -284,10 +302,12 @@ def sigRateCL():
     return cl_prefix + '''
 
         if (cellType == 1) {
-                    rates[0] = -k_A * A * volume / gridVolume;
-                } else {
-                    rates[0] = 0;
-                }
+                rates[0] = -k_deg_eff * A;
+        }
+         
+        else { 
+                rates[0] = 0;
+        }
     '''
 
 
