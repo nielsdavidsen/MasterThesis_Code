@@ -280,7 +280,6 @@ def init(cell):
 
 cl_prefix = \
     '''
-
         const float k_deg_eff = %rf;
 
         float A_in = species[0];
@@ -302,7 +301,7 @@ def sigRateCL():
     return cl_prefix + '''
 
         if (cellType == 1) {
-                rates[0] = -k_deg_eff * A;
+                rates[0] = -k_deg_eff * A / gridVolume;
         }
          
         else { 
