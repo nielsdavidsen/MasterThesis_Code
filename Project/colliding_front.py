@@ -258,8 +258,8 @@ def init(cell):
 cl_prefix = \
     '''
 
-        const float D_A = 20.0f;
-        const float k_deg = %rf;
+        
+        const float k_A = 10.0f;
 
         float A_in = species[0];
         float A = signals[0];
@@ -271,31 +271,19 @@ def specRateCL():
     # Remove diffusion in and out of cells
 
     return cl_prefix + '''
-
-        if (cellType==0){
-        // Antibiotic
-        rates[0] = D_A*(A-A_in)*area/gridVolume;
-        }
-
-        else {
-        // Antibiotic
-        rates[0] = D_A*(A-A_in)*area/gridVolume - k_deg*A_in;
-        }
-    '''
+    
+            rates[0] = 0;
+        '''
 
 def sigRateCL():
     global cl_prefix
     return cl_prefix + '''
 
-        if (cellType==0){
-        // Antibiotic
-        rates[0] = 0;
-        }
-
-        else {
-        // Antibiotic
-        rates[0] = - D_A*(A-A_in)*area/gridVolume;
-        }
+        if (cellType == 1) {
+                            rates[0] = -k_A * A * volume / gridVolume;
+                        } else {
+                            rates[0] = 0;
+                        }
     '''
 
 
@@ -324,7 +312,7 @@ def update(cells):
     for (id, cell) in cells.items():
 
         #Intracellular concentrations
-        A_in = cell.species[0]
+        A_in = cell.signals[0]
 
 
         if cell.cellType==0:
