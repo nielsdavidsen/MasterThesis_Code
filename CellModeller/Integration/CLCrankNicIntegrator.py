@@ -118,7 +118,7 @@ class CLCrankNicIntegrator:
 
     def CNOperator(self, v):
         # Transport operator
-        self.signalling.transportRates(self.signalRate, v, mode='greens')
+        self.signalling.transportRates(self.signalRate, v, mode='greens', boundcond=self.boundcond)
         # Return (I-hT/2)v, where T is transport operator, h=dt
         return v - 0.5*self.dt*self.signalRate
 
