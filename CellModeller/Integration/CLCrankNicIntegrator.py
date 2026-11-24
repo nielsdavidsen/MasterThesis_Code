@@ -125,11 +125,14 @@ class CLCrankNicIntegrator:
     def computeGreensFunc(self):
         L = LinearOperator((self.signalDataLen,self.signalDataLen), matvec=self.CNOperator, dtype=numpy.float32)
         rhs = numpy.zeros(self.gridDim, dtype=numpy.float32)
-        pos = numpy.array(self.signalling.gridOrig,dtype=numpy.float32) + 0.5*numpy.array(self.gridDim[1:],dtype=numpy.float32)*numpy.array(self.signalling.gridSize,dtype=numpy.float32)
-        #idx = ( math.floor(self.gridDim[1]*0.5), math.floor(self.gridDim[2]*0.5), math.floor(self.gridDim[3]*0.5) )
-        #for s in xrange(self.nSignals):
-        #    rhs[(s,)+idx] = 1.0 # ~delta function in each signal
-        self.signalling.interpAddToGrid(pos, numpy.ones(self.nSignals), rhs)
+        # Unit impulse exactly on the centre node, index gridDim//2 in each direction. scipy's convolve
+        # (used in step) centres the kernel on index size//2, so the impulse must sit on a node. The
+        # previous version put it at the geometric grid centre (gridOrig + 0.5*gridDim*gridSize), which
+        # for an odd grid dimension lies between two nodes: the impulse was split over both, the kernel
+        # was off-centre by half a grid spacing, and every step shifted all signals by gs/2.
+        idx = tuple(int(d) // 2 for d in self.gridDim[1:])
+        for s in range(self.nSignals):
+            rhs[(s,) + idx] = 1.0
         (self.greensFunc, info) = gmres(L,rhs.reshape(self.signalDataLen)) # Solve impulse response = greens func
         # Take only bounding box of region where G > threshold
         self.greensFunc.shape = self.gridDim
@@ -138,6 +141,15 @@ class CLCrankNicIntegrator:
                                             min(inds[:,2]):max(inds[:,2])+1, \
                                             min(inds[:,3]):max(inds[:,3])+1]
         print("Truncated Green's function size is " + str(self.greensFunc.shape))
+
+        # The impulse response above is solved with zero (absorbing) boundaries, see CNOperator. When
+        # it reaches the grid boundary (e.g. a grid only a few nodes deep in z) or gmres stops before
+        # full convergence, it sums to less than 1, and every step then removes that fraction of each
+        # signal everywhere on the grid. Diffusion conserves mass, so normalise each signal's kernel.
+        self.greensSumRaw = self.greensFunc.sum(axis=(1, 2, 3))
+        print("Green's function sum before normalisation: " + str(self.greensSumRaw))
+        self.greensFunc /= self.greensSumRaw[:, None, None, None]
+        self.greensSum = self.greensFunc.sum(axis=(1, 2, 3))
 
 
     def addCell(self, cellState):

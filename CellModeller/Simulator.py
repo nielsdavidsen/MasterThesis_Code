@@ -408,6 +408,9 @@ visualised.
             data['sigGrid'] = self.integ.signalLevel
             data['sigData'] = self.integ.cellSigLevels
             data['sigGrid'] = self.integ.signalLevel
+            if hasattr(self.integ, 'greensSum'):
+                # Sum of the diffusion kernel actually used (1 = mass conserving), see CLCrankNicIntegrator
+                data['greensSum'] = self.integ.greensSum
         pickle.dump(data, outfile, protocol=-1)
         #output csv file with cell pos,dir,len - sig?
 
